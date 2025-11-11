@@ -1,37 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import useLocalStorage from '../hooks/useLocalStorage';
 import Button from './Button';
+import Card from './Card';
 
-/**
- * Custom hook for managing tasks with localStorage persistence
- */
-const useLocalStorageTasks = () => {
-  // Initialize state from localStorage or with empty array
-  const [tasks, setTasks] = useState(() => {
-    const savedTasks = localStorage.getItem('tasks');
-    return savedTasks ? JSON.parse(savedTasks) : [];
-  });
+const TaskManager = () => {
+  const [tasks, setTasks] = useLocalStorage('tasks', []);
+  const [inputValue, setInputValue] = useState('');
+  const [filter, setFilter] = useState('all'); // 'all', 'active', 'completed'
 
-  // Update localStorage when tasks change
   useEffect(() => {
-    localStorage.setItem('tasks', JSON.stringify(tasks));
+    // This effect runs when tasks change, ensuring localStorage is updated
+    // The useLocalStorage hook already handles this, but we can add side effects here if needed
   }, [tasks]);
 
-  // Add a new task
-  const addTask = (text) => {
-    if (text.trim()) {
-      setTasks([
-        ...tasks,
-        {
-          id: Date.now(),
-          text,
-          completed: false,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
-    }
+  const addTask = () => {
+    if (inputValue.trim() === '') return;
+
+    const newTask = {
+      id: Date.now(),
+      text: inputValue.trim(),
+      completed: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    setTasks([...tasks, newTask]);
+    setInputValue('');
   };
 
-  // Toggle task completion status
   const toggleTask = (id) => {
     setTasks(
       tasks.map((task) =>
@@ -40,103 +35,100 @@ const useLocalStorageTasks = () => {
     );
   };
 
-  // Delete a task
   const deleteTask = (id) => {
     setTasks(tasks.filter((task) => task.id !== id));
   };
 
-  return { tasks, addTask, toggleTask, deleteTask };
-};
-
-/**
- * TaskManager component for managing tasks
- */
-const TaskManager = () => {
-  const { tasks, addTask, toggleTask, deleteTask } = useLocalStorageTasks();
-  const [newTaskText, setNewTaskText] = useState('');
-  const [filter, setFilter] = useState('all');
-
-  // Filter tasks based on selected filter
   const filteredTasks = tasks.filter((task) => {
     if (filter === 'active') return !task.completed;
     if (filter === 'completed') return task.completed;
-    return true; // 'all' filter
+    return true;
   });
 
-  // Handle form submission
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    addTask(newTaskText);
-    setNewTaskText('');
+  const activeTasksCount = tasks.filter((task) => !task.completed).length;
+  const completedTasksCount = tasks.filter((task) => task.completed).length;
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      addTask();
+    }
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-      <h2 className="text-2xl font-bold mb-6">Task Manager</h2>
+    <div className="max-w-4xl mx-auto animate-fade-in">
+      <h1 className="text-3xl font-bold mb-8 text-center text-gray-900 dark:text-white">
+        Task Manager
+      </h1>
 
-      {/* Task input form */}
-      <form onSubmit={handleSubmit} className="mb-6">
-        <div className="flex gap-2">
+      {/* Add Task Section */}
+      <Card className="mb-6 animate-slide-up">
+        <div className="flex flex-col sm:flex-row gap-3">
           <input
             type="text"
-            value={newTaskText}
-            onChange={(e) => setNewTaskText(e.target.value)}
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyPress={handleKeyPress}
             placeholder="Add a new task..."
-            className="flex-grow px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
           />
-          <Button type="submit" variant="primary">
+          <Button onClick={addTask} variant="primary">
             Add Task
           </Button>
         </div>
-      </form>
+      </Card>
 
-      {/* Filter buttons */}
-      <div className="flex gap-2 mb-4">
+      {/* Filter Buttons */}
+      <div className="flex flex-wrap gap-2 mb-6 justify-center">
         <Button
           variant={filter === 'all' ? 'primary' : 'secondary'}
-          size="sm"
           onClick={() => setFilter('all')}
         >
-          All
+          All ({tasks.length})
         </Button>
         <Button
           variant={filter === 'active' ? 'primary' : 'secondary'}
-          size="sm"
           onClick={() => setFilter('active')}
         >
-          Active
+          Active ({activeTasksCount})
         </Button>
         <Button
           variant={filter === 'completed' ? 'primary' : 'secondary'}
-          size="sm"
           onClick={() => setFilter('completed')}
         >
-          Completed
+          Completed ({completedTasksCount})
         </Button>
       </div>
 
-      {/* Task list */}
-      <ul className="space-y-2">
+      {/* Tasks List */}
+      <div className="space-y-3">
         {filteredTasks.length === 0 ? (
-          <li className="text-gray-500 dark:text-gray-400 text-center py-4">
-            No tasks found
-          </li>
+          <Card>
+            <p className="text-center text-gray-500 dark:text-gray-400 py-8">
+              {filter === 'all'
+                ? 'No tasks yet. Add one above!'
+                : filter === 'active'
+                ? 'No active tasks!'
+                : 'No completed tasks!'}
+            </p>
+          </Card>
         ) : (
           filteredTasks.map((task) => (
-            <li
+            <Card
               key={task.id}
-              className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-700"
+              className="animate-slide-up flex items-center justify-between group"
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center space-x-3 flex-1">
                 <input
                   type="checkbox"
                   checked={task.completed}
                   onChange={() => toggleTask(task.id)}
-                  className="h-5 w-5 text-blue-600 rounded focus:ring-blue-500"
+                  className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
                 />
                 <span
-                  className={`${
-                    task.completed ? 'line-through text-gray-500 dark:text-gray-400' : ''
+                  className={`flex-1 ${
+                    task.completed
+                      ? 'line-through text-gray-500 dark:text-gray-400'
+                      : 'text-gray-900 dark:text-gray-100'
                   }`}
                 >
                   {task.text}
@@ -144,25 +136,18 @@ const TaskManager = () => {
               </div>
               <Button
                 variant="danger"
-                size="sm"
                 onClick={() => deleteTask(task.id)}
-                aria-label="Delete task"
+                className="opacity-0 group-hover:opacity-100 transition-opacity ml-4"
               >
                 Delete
               </Button>
-            </li>
+            </Card>
           ))
         )}
-      </ul>
-
-      {/* Task stats */}
-      <div className="mt-6 text-sm text-gray-500 dark:text-gray-400">
-        <p>
-          {tasks.filter((task) => !task.completed).length} tasks remaining
-        </p>
       </div>
     </div>
   );
 };
 
-export default TaskManager; 
+export default TaskManager;
+
